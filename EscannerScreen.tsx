@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Text, View, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity, ImageBackground, Alert } from 'react-native';
 import { BarCodeScanner } from 'expo-barcode-scanner';
+import * as Location from 'expo-location';
 import axios from 'axios';
 import moment from 'moment-timezone';
 
@@ -9,6 +10,7 @@ const App: React.FC = () => {
   const [scanned, setScanned] = useState(false);
   const [text, setText] = useState('Aún no escaneado');
   const [action, setAction] = useState<'entrada' | 'salida' | null>(null);
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
 
   const askForCameraPermission = () => {
     (async () => {
@@ -17,41 +19,54 @@ const App: React.FC = () => {
     })();
   };
 
-  // Request Camera Permission
+  const askForLocationPermission = () => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso de ubicación denegado');
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      setLocation(loc);
+    })();
+  };
+
+  // Solicitar permisos de cámara y ubicación
   useEffect(() => {
     askForCameraPermission();
+    askForLocationPermission();
   }, []);
 
-  // What happens when we scan the bar code
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
     setScanned(true);
     setText(data);
-    console.log('Type: ' + type + '\nData: ' + data);
+    console.log('Tipo: ' + type + '\nDatos: ' + data);
 
-    // Parse the QR data (assuming it's in JSON format)
     const qrData = JSON.parse(data);
 
-    // Save scan data to the database
     const scanData = {
       name: qrData.name,
       puesto: qrData.puesto,
-      timestamp: moment().tz('America/Mexico_City').format(), // Use your local timezone
+      timestamp: moment().tz('America/Mexico_City').format(),
       action: action,
+      location: location ? {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      } : null,
     };
 
     try {
-      await axios.post('http://192.168.1.21:5000/api/save-scan', scanData); // Replace with your IP address
+      await axios.post('http://192.168.1.4:5000/api/save-scan', scanData);
       alert('Datos guardados correctamente');
     } catch (error) {
       console.error('Error al guardar datos', error);
     }
   };
 
-  // Check permissions and return the screens
   if (hasPermission === null) {
     return (
       <View style={styles.container}>
-        <Text>Requesting for camera permission</Text>
+        <Text>Solicitando permiso para la cámara</Text>
       </View>
     );
   }
@@ -59,24 +74,23 @@ const App: React.FC = () => {
   if (hasPermission === false) {
     return (
       <View style={styles.container}>
-        <Text style={{ margin: 10 }}>No access to camera</Text>
+        <Text style={{ margin: 10 }}>No hay acceso a la cámara</Text>
         <TouchableOpacity style={styles.button} onPress={askForCameraPermission}>
-          <Text style={styles.buttonText}>Allow Camera</Text>
+          <Text style={styles.buttonText}>Permitir Cámara</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // Return the View
   return (
-    <ImageBackground source={require(('./assets/img/2.jpg'))} style={styles.background}>
+    <ImageBackground source={require('./assets/img/2.jpg')} style={styles.background}>
       <View style={styles.container}>
         {!action ? (
           <View style={styles.buttonsContainer}>
             <TouchableOpacity
               style={[styles.button, { backgroundColor: 'green' }]}
               onPress={() => setAction('entrada')}
-            > 
+            >
               <Text style={styles.buttonText}>Entrada</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -137,8 +151,8 @@ const styles = StyleSheet.create({
   buttonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 40, // Increased bottom margin for more separation
-    paddingHorizontal: 20, // Added horizontal padding
+    marginBottom: 40,
+    paddingHorizontal: 20,
   },
   scannerContainer: {
     alignItems: 'center',
@@ -148,7 +162,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 30,
     marginBottom: 10,
-    marginHorizontal: 50, // Added horizontal margin for more separation
+    marginHorizontal: 50,
     alignItems: 'center',
   },
   buttonText: {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ImageBackground, Pressable, TextInput } from 'react-native';
+import { StyleSheet, Text, View, ImageBackground, Pressable, TextInput, Alert, Image } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Colors } from 'react-native/Libraries/NewAppScreen';
+import axios from 'axios';
 
 type Props = {
   navigation: StackNavigationProp<any>;
@@ -10,16 +10,57 @@ type Props = {
 const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isPressed, setIsPressed] = useState(false);
 
-  const handleLogin = () => {
-    console.log('Inicio de sesión básico');
-    navigation.navigate('Scanner');
+  const handleRegister = async () => {
+    if (!username || !password) {
+      Alert.alert('Error', 'Por favor, complete todos los campos.');
+      return;
+    }
+    try {
+      const response = await axios.post('http://192.168.1.4:5000/api/register', { username, password });
+      Alert.alert('Registro exitoso', response.data);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Error de registro:', error.message);
+        Alert.alert('Error de registro', error.message);
+      } else {
+        console.error('Error desconocido:', error);
+        Alert.alert('Error desconocido', 'Ocurrió un error inesperado');
+      }
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!username || !password) {
+      Alert.alert('Error', 'Por favor, complete todos los campos.');
+      return;
+    }
+
+    try {
+      const response = await axios.post('http://192.168.1.4:5000/api/login', { username, password });
+      Alert.alert('Inicio de sesión exitoso', response.data.message);
+      const { isAdmin } = response.data;
+      if (isAdmin) {
+        navigation.navigate('AdminScreen');
+      } else {
+        navigation.navigate('Scanner');
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Error de inicio de sesión:', error.message);
+        Alert.alert('Error de inicio de sesión', error.message);
+      } else {
+        console.error('Error desconocido:', error);
+        Alert.alert('Error desconocido', 'Ocurrió un error inesperado');
+      }
+    }
   };
 
   return (
     <ImageBackground source={require('./assets/img/1.jpg')} style={styles.background}>
       <View style={styles.container}>
+        {/* Añadir el logo */}
+        <Image source={require('./assets/img/5.png')} style={styles.logo} />
         <Text style={[styles.title, { color: 'white' }]}>Sistema de asistencias</Text>
 
         <View style={styles.formContainer}>
@@ -38,16 +79,11 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
             value={password}
             placeholderTextColor="black"
           />
-          <Pressable
-            style={({ pressed }) => [
-              styles.loginButton,
-              { backgroundColor: pressed ? 'darkgreen' : 'blue' }
-            ]}
-            onPressIn={() => setIsPressed(true)}
-            onPressOut={() => setIsPressed(false)}
-            onPress={handleLogin}
-          >
+          <Pressable style={styles.loginButton} onPress={handleLogin}>
             <Text style={styles.loginButtonText}>Iniciar sesión</Text>
+          </Pressable>
+          <Pressable style={styles.registerButton} onPress={handleRegister}>
+            <Text style={styles.registerButtonText}>Registrarse</Text>
           </Pressable>
         </View>
       </View>
@@ -66,8 +102,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  logo: { // Estilo para el logo
+    width: 200,
+    height: 100,
+    marginBottom:50,
+  },
   formContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)', // Fondo traslúcido
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     padding: 20,
     borderRadius: 10,
   },
@@ -84,14 +125,25 @@ const styles = StyleSheet.create({
     borderColor: 'black',
     borderRadius: 5,
     paddingLeft: 10,
-    color: 'white', // Cambia el color del texto de entrada
+    color: 'black',
   },
   loginButton: {
+    backgroundColor: 'blue',
     padding: 10,
-    borderRadius: 5,
+    borderRadius: 50,
     marginTop: 10,
   },
   loginButtonText: {
+    color: 'white',
+    textAlign: 'center',
+  },
+  registerButton: {
+    backgroundColor: 'green',
+    padding: 10,
+    borderRadius: 50,
+    marginTop: 10,
+  },
+  registerButtonText: {
     color: 'white',
     textAlign: 'center',
   },
